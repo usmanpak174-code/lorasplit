@@ -1,0 +1,528 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: PortaSplit Stock Alerts API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: products
+    description: Monitored AC products
+  - name: stores
+    description: Retail store locations
+  - name: stock
+    description: Stock availability
+  - name: alerts
+    description: Email alert subscriptions
+  - name: plans
+    description: Pricing plans
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all monitored products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get product with latest stock summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+        "404":
+          description: Not found
+
+  /stores:
+    get:
+      operationId: listStores
+      tags: [stores]
+      summary: List retail stores with optional filters
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: integer
+        - name: chain
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [in_stock, low_stock, out_of_stock]
+        - name: postalCode
+          in: query
+          schema:
+            type: string
+        - name: radiusKm
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of stores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoreWithStock"
+
+  /stores/{id}:
+    get:
+      operationId: getStore
+      tags: [stores]
+      summary: Get store detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Store detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreWithStock"
+        "404":
+          description: Not found
+
+  /stock/map:
+    get:
+      operationId: getStockMap
+      tags: [stock]
+      summary: Get map data - all stores with coordinates and stock status
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Map stock data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockMapPoint"
+
+  /stock/summary:
+    get:
+      operationId: getStockSummary
+      tags: [stock]
+      summary: Summary stats - total stores, in stock count, last checked
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stock summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockSummary"
+
+  /stock/chains:
+    get:
+      operationId: listChains
+      tags: [stock]
+      summary: List all retail store chains being monitored
+      responses:
+        "200":
+          description: List of chains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChainStat"
+
+  /alerts:
+    post:
+      operationId: createAlert
+      tags: [alerts]
+      summary: Subscribe to restock email alerts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertInput"
+      responses:
+        "201":
+          description: Alert created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertSubscription"
+        "400":
+          description: Invalid input
+        "409":
+          description: Already subscribed
+
+  /alerts/{token}:
+    delete:
+      operationId: deleteAlert
+      tags: [alerts]
+      summary: Unsubscribe from alerts using token from email
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unsubscribed
+        "404":
+          description: Not found
+
+  /alerts/verify/{token}:
+    get:
+      operationId: verifyAlert
+      tags: [alerts]
+      summary: Verify email address for alerts
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verified
+        "404":
+          description: Not found
+
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List available pricing plans
+      responses:
+        "200":
+          description: Available plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+
+  /checkout:
+    post:
+      operationId: createCheckout
+      tags: [plans]
+      summary: Initiate Polar.sh checkout for a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResult"
+        "400":
+          description: Invalid plan
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    Product:
+      type: object
+      required: [id, name, model, imageUrl, slug]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        model:
+          type: string
+        slug:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        checkIntervalSeconds:
+          type: integer
+
+    ProductDetail:
+      type: object
+      required: [id, name, model, slug, storeCount, inStockCount, lastCheckedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        model:
+          type: string
+        slug:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        storeCount:
+          type: integer
+        inStockCount:
+          type: integer
+        lowStockCount:
+          type: integer
+        outOfStockCount:
+          type: integer
+        reservedCount:
+          type: integer
+        lastCheckedAt:
+          type: ["string", "null"]
+        checkIntervalSeconds:
+          type: integer
+
+    Store:
+      type: object
+      required: [id, name, chain, address, city, postalCode, lat, lng]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        chain:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        url:
+          type: ["string", "null"]
+
+    StoreWithStock:
+      type: object
+      required: [id, name, chain, address, city, postalCode, lat, lng, stockStatus, lastCheckedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        chain:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        url:
+          type: ["string", "null"]
+        stockStatus:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, reserved]
+        stockQty:
+          type: ["integer", "null"]
+        lastCheckedAt:
+          type: ["string", "null"]
+        productId:
+          type: ["integer", "null"]
+
+    StockMapPoint:
+      type: object
+      required: [storeId, name, chain, lat, lng, status]
+      properties:
+        storeId:
+          type: integer
+        name:
+          type: string
+        chain:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        status:
+          type: string
+          enum: [in_stock, low_stock, out_of_stock, reserved]
+        stockQty:
+          type: ["integer", "null"]
+        city:
+          type: string
+
+    StockSummary:
+      type: object
+      required: [totalStores, inStockCount, lowStockCount, outOfStockCount, reservedCount, lastCheckedAt]
+      properties:
+        totalStores:
+          type: integer
+        inStockCount:
+          type: integer
+        lowStockCount:
+          type: integer
+        outOfStockCount:
+          type: integer
+        reservedCount:
+          type: integer
+        lastCheckedAt:
+          type: ["string", "null"]
+        activeSubscribers:
+          type: integer
+
+    ChainStat:
+      type: object
+      required: [chain, storeCount, inStockCount]
+      properties:
+        chain:
+          type: string
+        storeCount:
+          type: integer
+        inStockCount:
+          type: integer
+        logoUrl:
+          type: ["string", "null"]
+
+    AlertInput:
+      type: object
+      required: [email, productId]
+      properties:
+        email:
+          type: string
+        productId:
+          type: integer
+        postalCode:
+          type: ["string", "null"]
+        radiusKm:
+          type: ["integer", "null"]
+        chain:
+          type: ["string", "null"]
+        planId:
+          type: ["string", "null"]
+
+    AlertSubscription:
+      type: object
+      required: [id, email, productId, status, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        productId:
+          type: integer
+        status:
+          type: string
+          enum: [pending, active, cancelled]
+        postalCode:
+          type: ["string", "null"]
+        radiusKm:
+          type: ["integer", "null"]
+        chain:
+          type: ["string", "null"]
+        planId:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    Plan:
+      type: object
+      required: [id, name, durationDays, priceEur, checkIntervalSeconds, features]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        durationDays:
+          type: integer
+        priceEur:
+          type: number
+        checkIntervalSeconds:
+          type: integer
+        features:
+          type: array
+          items:
+            type: string
+        popular:
+          type: boolean
+        polarProductId:
+          type: ["string", "null"]
+
+    CheckoutInput:
+      type: object
+      required: [planId, email]
+      properties:
+        planId:
+          type: string
+        email:
+          type: string
+        productId:
+          type: ["integer", "null"]
+
+    CheckoutResult:
+      type: object
+      required: [checkoutUrl]
+      properties:
+        checkoutUrl:
+          type: string

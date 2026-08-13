@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "PortaSplit Stock Alerts"
+version = "1.0.0"
+id = "artifacts/portasplit-alerts"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19703
+
+[services.development]
+run = "pnpm --filter @workspace/portasplit-alerts run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/portasplit-alerts", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/portasplit-alerts/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19703"
+BASE_PATH = "/"

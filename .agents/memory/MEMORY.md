@@ -1,0 +1,2 @@
+- [Polar.sh checkout](polar-checkout.md) — correct endpoint is POST /v1/checkouts/ (trailing slash), body needs product_id not product_price_id
+- [Resend email setup](resend-email.md) — no verified domain yet; using onboarding@resend.dev sender (sandbox only); FROM_EMAIL env var controls sender
